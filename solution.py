@@ -5,15 +5,17 @@ from utils import *
 row_units = [cross(r, cols) for r in rows]
 column_units = [cross(rows, c) for c in cols]
 square_units = [cross(rs, cs) for rs in ('ABC','DEF','GHI') for cs in ('123','456','789')]
-unitlist = row_units + column_units + square_units
+diag1 = [[str(s)+str(10- int(t)) for (s,t) in zip(rows,cols)]]
+diag2 = [[s+t for (s,t) in zip(rows,cols)]]
+unitlist = row_units + column_units + square_units + diag1 + diag2
 
 # TODO: Update the unit list to add the new diagonal units
 unitlist = unitlist
 
 
 # Must be called after all units (including diagonals) are added to the unitlist
-units = extract_units(unitlist, boxes)
-peers = extract_peers(units, boxes)
+units = dict((s, [u for u in unitlist if s in u]) for s in boxes)
+peers = dict((s, set(sum(units[s],[]))-set([s])) for s in boxes)
 
 
 def naked_twins(values):
@@ -44,6 +46,23 @@ def naked_twins(values):
     strategy repeatedly).
     """
     # TODO: Implement this function!
+    potential_twins = [box for box in values.keys() if len(values[box]) == 2]
+    naked_twins = [[box1,box2] for box1 in potential_twins \
+                    for box2 in peers[box1] \
+                    if set(values[box1])==set(values[box2]) ]
+
+   
+    for i in range(len(naked_twins)):
+        box1 = naked_twins[i][0]
+        box2 = naked_twins[i][1]
+        peers1 = set(peers[box1])
+        peers2 = set(peers[box2])
+        peers_int = peers1 & peers2
+        for peer_val in peers_int:
+            if len(values[peer_val])>2:
+                for rm_val in values[box1]:
+                    values = assign_value(values, peer_val, values[peer_val].replace(rm_val,''))
+    return values
     raise NotImplementedError
 
 
@@ -64,6 +83,12 @@ def eliminate(values):
         The values dictionary with the assigned values eliminated from peers
     """
     # TODO: Copy your code from the classroom to complete this function
+    solved_values = [box for box in values.keys() if len(values[box]) == 1]
+    for box in solved_values:
+        digit = values[box]
+        for peer in peers[box]:
+            values = assign_value(values, peer, values[peer].replace(digit,''))
+    return values
     raise NotImplementedError
 
 
@@ -88,6 +113,12 @@ def only_choice(values):
     You should be able to complete this function by copying your code from the classroom
     """
     # TODO: Copy your code from the classroom to complete this function
+    for unit in unitlist:
+        for digit in '123456789':
+            dplaces = [box for box in unit if digit in values[box]]
+            if len(dplaces) == 1:
+                values = assign_value(values, dplaces[0], digit)
+    return values
     raise NotImplementedError
 
 
@@ -106,6 +137,18 @@ def reduce_puzzle(values):
         no longer produces any changes, or False if the puzzle is unsolvable 
     """
     # TODO: Copy your code from the classroom and modify it to complete this function
+    solved_values = [box for box in values.keys() if len(values[box]) == 1]
+    stalled = False
+    while not stalled:
+        solved_values_before = len([box for box in values.keys() if len(values[box]) == 1])
+        values = eliminate(values)
+        values = naked_twins(values)
+        values = only_choice(values)
+        solved_values_after = len([box for box in values.keys() if len(values[box]) == 1])
+        stalled = solved_values_before == solved_values_after
+        if len([box for box in values.keys() if len(values[box]) == 0]):
+            return False
+    return values
     raise NotImplementedError
 
 
@@ -129,6 +172,22 @@ def search(values):
     and extending it to call the naked twins strategy.
     """
     # TODO: Copy your code from the classroom to complete this function
+    values = reduce_puzzle(values)
+    
+    if values is False:
+        return False
+    
+    if all(len(values[s]) == 1 for s in boxes):
+        return values
+
+    n,s = min((len(values[s]), s) for s in boxes if len(values[s]) > 1)
+    
+    for value in values[s]:
+        new_sudoku = values.copy()
+        new_sudoku = assign_value(new_sudoku, s, value)
+        attempt = search(new_sudoku)
+        if attempt:
+            return attempt
     raise NotImplementedError
 
 
